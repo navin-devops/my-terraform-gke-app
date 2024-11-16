@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+
+    environment {
+        GOOGLE_CREDENTIALS = credentials('gcp-service-account')  // Store the GCP service account in Jenkins credentials
+        PROJECT_ID        = "gleaming-lead-438006-g4"
+        GKE_CLUSTER       = "my-cluster"
+        ZONE              = "us-central1-a"
+        KUBE_CONTEXT      = "gke_${PROJECT_ID}_${ZONE}_${GKE_CLUSTER}"
+    }
+
+    stages {
+        stage('Setup') {
+            steps {
+                script {
+                    // Initialize Terraform
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                script {
+                    // Apply Terraform to create the cluster and deploy the app
+                    sh 'terraform apply -auto-approve'
+                }
+            }
+        }
+
+        stage('Build and Push Docker Image') {
+            steps {
+                script {
+                    // Build Docker image and push it to Google Container Registry
+                    sh """
+                    docker build -t gcr.io/${PROJECT_ID}/example-app:latest ./app
+                    gcloud auth configure-docker
+                    docker push gcr.io/${PROJECT_ID}/example-app:latest
+                    """
+                }
+            }
+        }
+
+        stage('Configure kubectl') {
+            steps {
+                script {
+                    // Get GKE credentials for kubectl
+                    sh """
+                    gcloud container clusters get-credentials ${GKE_CLUSTER} \
+                        --zone ${ZONE} \
+                        --project ${PROJECT_ID}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy App to GKE') {
+            steps {
+                script {
+                    // Deploy the app using kubectl (e.g., apply or rollout)
+                    sh 'kubectl rollout restart deployment/example-app'
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                script {
+                    // Optionally, clean up the resources after deployment
+                    sh 'terraform destroy -auto-approve'
+                }
+            }
+        }
+    }
+}
