@@ -57,7 +57,7 @@ pipeline {
         stage('Deploy App to GKE') {
             steps {
                 script {
-                    // Deploy1 the app using kubectl (e.g., apply or rollout)
+                    // Deploy2 the app using kubectl (e.g., apply or rollout)
                     sh 'kubectl rollout restart deployment/example-app'
                 }
             }
